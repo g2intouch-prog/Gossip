@@ -29,10 +29,9 @@ export default function GossipApp() {
   // Authentication & Session States
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [loginType, setLoginType] = useState('member'); // 'member' | 'admin'
   const [username, setUsername] = useState('');
   const [passcode, setPasscode] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
+  const [selectedLoginGroupId, setSelectedLoginGroupId] = useState('');
   const [authError, setAuthError] = useState('');
 
   // Dropdown options for active groups
@@ -181,6 +180,7 @@ export default function GossipApp() {
         if (data.length > 0) {
           setRequestGroupId(data[0].id);
           setForgotGroupId(data[0].id);
+          setSelectedLoginGroupId(data[0].id);
         }
       }
     } catch (e) {
@@ -192,14 +192,10 @@ export default function GossipApp() {
     e.preventDefault();
     setAuthError('');
     try {
-      const payload = loginType === 'admin' 
-        ? { type: 'admin', password: adminPassword }
-        : { type: 'member', username, passcode };
-
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ type: 'member', username, passcode }),
       });
 
       const data = await res.json();
@@ -210,7 +206,6 @@ export default function GossipApp() {
       setUser(data.user);
       setUsername('');
       setPasscode('');
-      setAdminPassword('');
     } catch (err) {
       setAuthError(err.message);
     }
@@ -773,34 +768,7 @@ export default function GossipApp() {
           {!showRequestForm && !showGroupRegForm ? (
             // --- LOGIN FORM ---
             <form onSubmit={handleLogin} className="space-y-5">
-              <div className="flex bg-gossip-dark p-1 rounded-xl border border-gossip-border">
-                <button
-                  type="button"
-                  onClick={() => { setLoginType('member'); setAuthError(''); }}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                    loginType === 'member' 
-                      ? 'bg-gossip-purple text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Member Login
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setLoginType('admin'); setAuthError(''); }}
-                  className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
-                    loginType === 'admin' 
-                      ? 'bg-gossip-purple text-white shadow-lg' 
-                      : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Group Admin
-                </button>
-              </div>
-
-              <h2 className="text-md font-bold text-white text-center">
-                {loginType === 'admin' ? 'Authorize Admin Credentials' : 'Authenticate Member Access'}
-              </h2>
+              <h2 className="text-md font-bold text-white text-center">Sign In to Gossip</h2>
 
               {authError && (
                 <div className="flex items-center gap-2 bg-red-950/50 border border-red-500/40 text-red-200 text-xs p-3 rounded-xl animate-shake">
@@ -809,66 +777,71 @@ export default function GossipApp() {
                 </div>
               )}
 
-              {loginType === 'member' ? (
-                // Member Inputs (By Username)
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5 pl-1">Username</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter your username"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl text-xs glass-input"
-                    />
+              {/* Group Selector */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5 pl-1">Select Your Group</label>
+                {publicGroups.length === 0 ? (
+                  <div className="w-full px-4 py-3 rounded-xl text-xs glass-input text-gray-500 italic">
+                    No active groups available
                   </div>
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5 pl-1 pr-1">
-                      <label className="block text-xs font-medium text-gray-400">Passcode</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowForgotModal(true);
-                          setForgotStatus(null);
-                          setForgotError('');
-                        }}
-                        className="text-[10px] text-gossip-pink hover:underline font-semibold"
-                      >
-                        Forgot Passcode?
-                      </button>
-                    </div>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Enter 4-digit PIN"
-                      value={passcode}
-                      onChange={(e) => setPasscode(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl text-xs glass-input text-center tracking-widest font-mono"
-                    />
-                  </div>
-                </div>
-              ) : (
-                // Admin Inputs (Fallback System Login / Group admin is standard user)
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5 pl-1">Admin Password</label>
-                  <input
-                    type="password"
+                ) : (
+                  <select
+                    value={selectedLoginGroupId}
+                    onChange={(e) => setSelectedLoginGroupId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl text-xs glass-input bg-gossip-dark text-white cursor-pointer"
                     required
-                    placeholder="Enter security key"
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-xs glass-input text-center tracking-widest font-mono"
-                  />
-                  <p className="text-[10px] text-gray-500 mt-2 pl-1 leading-relaxed">
-                    Note: Registered Group Admins log in using the "Member Login" tab with their admin username and passcode.
-                  </p>
+                  >
+                    {publicGroups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* Username */}
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5 pl-1">Username</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-xs glass-input"
+                />
+              </div>
+
+              {/* Passcode */}
+              <div>
+                <div className="flex justify-between items-center mb-1.5 pl-1 pr-1">
+                  <label className="block text-xs font-medium text-gray-400">Passcode</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedLoginGroupId) setForgotGroupId(selectedLoginGroupId);
+                      setShowForgotModal(true);
+                      setForgotStatus(null);
+                      setForgotError('');
+                    }}
+                    className="text-[10px] text-gossip-pink hover:underline font-semibold"
+                  >
+                    Forgot Passcode?
+                  </button>
                 </div>
-              )}
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter your passcode"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl text-xs glass-input text-center tracking-widest font-mono"
+                />
+              </div>
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-gradient-to-r from-gossip-purple to-gossip-pink hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all shadow-md text-xs cursor-pointer active:scale-[0.98]"
+                disabled={publicGroups.length === 0}
+                className="w-full py-3.5 bg-gradient-to-r from-gossip-purple to-gossip-pink hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all shadow-md text-xs cursor-pointer active:scale-[0.98] disabled:opacity-40"
               >
                 Access Gossip Chat
               </button>

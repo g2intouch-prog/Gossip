@@ -44,60 +44,8 @@ export async function POST(request) {
       return NextResponse.json({ success: true, message: 'Logged out successfully' });
     }
 
-    // System Fallback Admin login path
-    if (type === 'admin') {
-      if (!password || password !== ADMIN_PASSWORD) {
-        return NextResponse.json({ error: 'Invalid admin password' }, { status: 401 });
-      }
-
-      // Check if default admin exists
-      const members = await getMembers();
-      let defaultAdmin = members.find(m => m.username === 'admin');
-      
-      if (!defaultAdmin) {
-        // If not found, use default details
-        defaultAdmin = {
-          id: 'admin-id-default',
-          name: 'Admin User',
-          username: 'admin',
-          role: 'admin',
-          groupId: 'group-default-id'
-        };
-      }
-
-      const token = await createSessionToken({
-        id: defaultAdmin.id,
-        name: defaultAdmin.name,
-        username: defaultAdmin.username,
-        groupId: defaultAdmin.groupId,
-        role: 'admin'
-      });
-
-      const host = request.headers.get('host') || '';
-      const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
-      const isSecure = process.env.NODE_ENV === 'production' && !isLocalhost;
-
-      const cookieStore = await cookies();
-      cookieStore.set('gossip_session', token, {
-        httpOnly: true,
-        secure: isSecure,
-        sameSite: 'strict',
-        path: '/'
-      });
-
-      return NextResponse.json({
-        success: true,
-        user: { 
-          id: defaultAdmin.id, 
-          name: defaultAdmin.name, 
-          username: defaultAdmin.username, 
-          groupId: defaultAdmin.groupId,
-          role: 'admin' 
-        }
-      });
-    }
-
-    // Regular member & Group admin login path (By Username)
+    // Regular member & Group admin login path (By Username+Passcode)
+    // Role (admin/member) is determined automatically from the member record.
     if (!username || !passcode) {
       return NextResponse.json({ error: 'Username and passcode are required' }, { status: 400 });
     }
