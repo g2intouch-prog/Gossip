@@ -1,8 +1,15 @@
-import { kv } from '@vercel/kv';
-import fs from 'fs';
-import path from 'path';
-
+// Dynamic import for @vercel/kv to avoid build crashes if not configured
+let kv = null;
 const isKVConfigured = !!(process.env.KV_REST_API_URL || process.env.KV_URL);
+
+if (isKVConfigured) {
+  try {
+    const kvModule = await import('@vercel/kv');
+    kv = kvModule.kv;
+  } catch (e) {
+    console.warn('Failed to import @vercel/kv, falling back to mock DB:', e.message);
+  }
+}
 
 // Seed default group data
 const DEFAULT_GROUP = {
@@ -31,51 +38,87 @@ const DEFAULT_ADMIN = {
   lastSeen: new Date().toISOString()
 };
 
-// File-based Mock DB for local testing
-const MOCK_DB_PATH = path.join(process.cwd(), 'gossip_mock_db.json');
+// In-memory fallback store for serverless environments (Vercel)
+// Data here does NOT persist across function invocations without KV!
+let inMemoryDB = null;
+
+function getDefaultDB() {
+  return {
+    groups: [DEFAULT_GROUP],
+    groupRequests: [],
+    members: [DEFAULT_ADMIN],
+    messages: [],
+    requests: [],
+    passwordResetRequests: []
+  };
+}
+
+// Detect if we can use the filesystem (local dev) or need in-memory (Vercel)
+// Cache the fs module reference for reuse
+let useFilesystem = false;
+let MOCK_DB_PATH = '';
+let fsModule = null;
+
+try {
+  const fsImport = await import('fs');
+  const pathImport = await import('path');
+  fsModule = fsImport.default;
+  MOCK_DB_PATH = pathImport.default.join(process.cwd(), 'gossip_mock_db.json');
+  // Test if we can write to the filesystem
+  if (fsModule.existsSync(MOCK_DB_PATH)) {
+    useFilesystem = true;
+  } else {
+    // Try creating the file to verify write access
+    fsModule.writeFileSync(MOCK_DB_PATH, JSON.stringify(getDefaultDB(), null, 2));
+    useFilesystem = true;
+  }
+} catch (e) {
+  // Filesystem not available (Vercel serverless), use in-memory
+  useFilesystem = false;
+  console.warn('Filesystem not available, using in-memory DB. Configure Vercel KV for persistence.');
+}
 
 function getMockDB() {
-  if (!fs.existsSync(MOCK_DB_PATH)) {
-    const initialData = {
-      groups: [DEFAULT_GROUP],
-      groupRequests: [],
-      members: [DEFAULT_ADMIN],
-      messages: [],
-      requests: [],
-      passwordResetRequests: []
-    };
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(initialData, null, 2));
-    return initialData;
+  if (useFilesystem && fsModule) {
+    try {
+      if (!fsModule.existsSync(MOCK_DB_PATH)) {
+        const initialData = getDefaultDB();
+        fsModule.writeFileSync(MOCK_DB_PATH, JSON.stringify(initialData, null, 2));
+        return initialData;
+      }
+      const content = fsModule.readFileSync(MOCK_DB_PATH, 'utf-8');
+      const data = JSON.parse(content);
+      // Ensure all collections exist
+      if (!data.groups) data.groups = [DEFAULT_GROUP];
+      if (!data.groupRequests) data.groupRequests = [];
+      if (!data.members) data.members = [DEFAULT_ADMIN];
+      if (!data.messages) data.messages = [];
+      if (!data.requests) data.requests = [];
+      if (!data.passwordResetRequests) data.passwordResetRequests = [];
+      return data;
+    } catch (e) {
+      console.error('Error reading mock DB file:', e);
+    }
   }
-  try {
-    const content = fs.readFileSync(MOCK_DB_PATH, 'utf-8');
-    const data = JSON.parse(content);
-    // Ensure all collections exist
-    if (!data.groups) data.groups = [DEFAULT_GROUP];
-    if (!data.groupRequests) data.groupRequests = [];
-    if (!data.members) data.members = [DEFAULT_ADMIN];
-    if (!data.messages) data.messages = [];
-    if (!data.requests) data.requests = [];
-    if (!data.passwordResetRequests) data.passwordResetRequests = [];
-    return data;
-  } catch (e) {
-    return {
-      groups: [DEFAULT_GROUP],
-      groupRequests: [],
-      members: [DEFAULT_ADMIN],
-      messages: [],
-      requests: [],
-      passwordResetRequests: []
-    };
+
+  // In-memory fallback
+  if (!inMemoryDB) {
+    inMemoryDB = getDefaultDB();
   }
+  return inMemoryDB;
 }
 
 function writeMockDB(data) {
-  try {
-    fs.writeFileSync(MOCK_DB_PATH, JSON.stringify(data, null, 2));
-  } catch (e) {
-    console.error('Error writing mock DB:', e);
+  if (useFilesystem && fsModule) {
+    try {
+      fsModule.writeFileSync(MOCK_DB_PATH, JSON.stringify(data, null, 2));
+      return;
+    } catch (e) {
+      console.error('Error writing mock DB file, storing in memory:', e);
+    }
   }
+  // In-memory fallback
+  inMemoryDB = data;
 }
 
 // GROUPS HELPERS
