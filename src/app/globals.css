@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #06020c;
+  --foreground: #f3f4f6;
+  --gossip-purple: #8b5cf6;
+  --gossip-pink: #ec4899;
+  --gossip-amber: #f59e0b;
+}
+
+body {
+  color: var(--foreground);
+  background: radial-gradient(circle at top, #120925 0%, var(--background) 70%);
+  background-attachment: fixed;
+  min-height: 100vh;
+  font-family: var(--font-outfit), 'Inter', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar for chat container */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(19, 13, 34, 0.5);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* Pulse keyframes for glowing active users */
+@keyframes active-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 12px 4px rgba(139, 92, 246, 0.2);
+  }
+}
+
+/* Hand wave animation for availability toggles */
+@keyframes wave-hand-left {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg); }
+  75% { transform: rotate(10deg); }
+}
+
+@keyframes wave-hand-right {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  75% { transform: rotate(-10deg); }
+}
+
+.animate-wave-left {
+  animation: wave-hand-left 1.2s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.animate-wave-right {
+  animation: wave-hand-right 1.2s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.glow-purple {
+  box-shadow: 0 0 20px 2px rgba(139, 92, 246, 0.25);
+}
+
+.glow-pink {
+  box-shadow: 0 0 20px 2px rgba(236, 72, 153, 0.25);
+}
+
+.glow-amber {
+  box-shadow: 0 0 20px 2px rgba(245, 158, 11, 0.25);
+}
+
+/* Safe Area Inset Padding for Mobile Devices */
+.safe-bottom-padding {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 5rem);
+}
+.safe-bottom-margin {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(19, 13, 34, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+.glass-input {
+  background: rgba(10, 5, 22, 0.8);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #fff;
+  transition: all 0.2s ease-in-out;
+}
+.glass-input:focus {
+  border-color: var(--gossip-purple);
+  box-shadow: 0 0 10px 0 rgba(139, 92, 246, 0.3);
+  outline: none;
+}
