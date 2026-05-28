@@ -126,7 +126,7 @@ export async function getGroups() {
   if (isKVConfigured) {
     try {
       let groups = await kv.get('gossip:groups');
-      if (!groups || groups.length === 0) {
+      if (!Array.isArray(groups)) {
         groups = [DEFAULT_GROUP];
         await kv.set('gossip:groups', groups);
       }
@@ -135,7 +135,8 @@ export async function getGroups() {
       console.error('Error reading groups from KV, falling back to mock:', e);
     }
   }
-  return getMockDB().groups;
+  const db = getMockDB();
+  return Array.isArray(db.groups) ? db.groups : [DEFAULT_GROUP];
 }
 
 export async function saveGroups(groups) {
@@ -198,12 +199,13 @@ export async function getGroupRequests() {
   if (isKVConfigured) {
     try {
       const requests = await kv.get('gossip:groupRequests');
-      return requests || [];
+      return Array.isArray(requests) ? requests : [];
     } catch (e) {
       console.error('Error reading groupRequests from KV:', e);
     }
   }
-  return getMockDB().groupRequests || [];
+  const db = getMockDB();
+  return Array.isArray(db.groupRequests) ? db.groupRequests : [];
 }
 
 export async function saveGroupRequests(requests) {
@@ -255,7 +257,7 @@ export async function getMembers() {
   if (isKVConfigured) {
     try {
       let members = await kv.get('gossip:members');
-      if (!members || members.length === 0) {
+      if (!Array.isArray(members)) {
         members = [DEFAULT_ADMIN];
         await kv.set('gossip:members', members);
       }
@@ -264,7 +266,8 @@ export async function getMembers() {
       console.error('Error reading members from KV, falling back to mock:', e);
     }
   }
-  return getMockDB().members;
+  const db = getMockDB();
+  return Array.isArray(db.members) ? db.members : [DEFAULT_ADMIN];
 }
 
 export async function saveMembers(members) {
@@ -327,12 +330,13 @@ export async function getRequests() {
   if (isKVConfigured) {
     try {
       const requests = await kv.get('gossip:requests');
-      return requests || [];
+      return Array.isArray(requests) ? requests : [];
     } catch (e) {
       console.error('Error reading requests from KV:', e);
     }
   }
-  return getMockDB().requests || [];
+  const db = getMockDB();
+  return Array.isArray(db.requests) ? db.requests : [];
 }
 
 export async function saveRequests(requests) {
@@ -384,12 +388,13 @@ export async function getPasswordResetRequests() {
   if (isKVConfigured) {
     try {
       const requests = await kv.get('gossip:passwordResetRequests');
-      return requests || [];
+      return Array.isArray(requests) ? requests : [];
     } catch (e) {
       console.error('Error reading passwordResetRequests from KV:', e);
     }
   }
-  return getMockDB().passwordResetRequests || [];
+  const db = getMockDB();
+  return Array.isArray(db.passwordResetRequests) ? db.passwordResetRequests : [];
 }
 
 export async function savePasswordResetRequests(requests) {
@@ -441,12 +446,13 @@ export async function getMessages() {
   if (isKVConfigured) {
     try {
       const messages = await kv.get('gossip:messages');
-      return messages || [];
+      return Array.isArray(messages) ? messages : [];
     } catch (e) {
       console.error('Error reading messages from KV:', e);
     }
   }
-  return getMockDB().messages || [];
+  const db = getMockDB();
+  return Array.isArray(db.messages) ? db.messages : [];
 }
 
 export async function saveMessages(messages) {

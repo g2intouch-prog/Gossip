@@ -55,7 +55,7 @@ export async function PUT(request) {
     // Find the member to update
     const members = await getMembers();
     const member = members.find(m => 
-      m.username.toLowerCase() === resetReq.username.toLowerCase() && 
+      m.username && m.username.toLowerCase() === resetReq.username.toLowerCase() && 
       m.groupId === session.groupId
     );
 

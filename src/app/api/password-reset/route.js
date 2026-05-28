@@ -13,7 +13,7 @@ export async function POST(request) {
     // Verify member exists in the group
     const members = await getMembers();
     const memberExists = members.some(m => 
-      m.username.toLowerCase() === username.toLowerCase() && 
+      m.username && m.username.toLowerCase() === username.toLowerCase() && 
       m.groupId === groupId
     );
 
@@ -24,7 +24,7 @@ export async function POST(request) {
     // Check if there is already a pending reset request
     const requests = await getPasswordResetRequests();
     const pendingExists = requests.some(r => 
-      r.username.toLowerCase() === username.toLowerCase() && 
+      r.username && r.username.toLowerCase() === username.toLowerCase() && 
       r.groupId === groupId && 
       r.status === 'pending'
     );

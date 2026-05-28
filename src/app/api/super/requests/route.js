@@ -111,7 +111,7 @@ export async function POST(request) {
     }
 
     const members = await getMembers();
-    if (members.some(m => m.username.toLowerCase() === adminUsername.toLowerCase())) {
+    if (members.some(m => m.username && m.username.toLowerCase() === adminUsername.toLowerCase())) {
       return NextResponse.json({ error: 'This Admin Username is already taken' }, { status: 400 });
     }
 

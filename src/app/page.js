@@ -705,15 +705,15 @@ export default function GossipApp() {
 
   // Filtered members list for home and selection
   const filteredMembers = members.filter(m => 
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.username.toLowerCase().includes(searchQuery.toLowerCase())
+    (m.name && m.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (m.username && m.username.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Filtered contact list for contact popup modal
   const filteredContacts = members.filter(m => 
     m.id !== user?.id &&
-    (m.name.toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
-     m.username.toLowerCase().includes(contactSearchQuery.toLowerCase()))
+    ((m.name && m.name.toLowerCase().includes(contactSearchQuery.toLowerCase())) ||
+     (m.username && m.username.toLowerCase().includes(contactSearchQuery.toLowerCase())))
   );
 
   // Selected DM recipient
