@@ -35,3 +35,6 @@ next-env.d.ts
 
 # local mock database
 gossip_mock_db.json
+
+.vercel
+.env*
