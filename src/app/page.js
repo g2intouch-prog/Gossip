@@ -64,8 +64,10 @@ export default function GossipApp() {
   const [forgotGroupId, setForgotGroupId] = useState('');
   const [forgotStatus, setForgotStatus] = useState(null); // 'submitting' | 'success' | 'error'
   const [forgotError, setForgotError] = useState('');
+  const [forgotGroupFilter, setForgotGroupFilter] = useState('');
 
-  // Change Password States (Home Tab)
+  // Group Request Filter
+  const [requestGroupFilter, setRequestGroupFilter] = useState('');  // Change Password States (Home Tab)
   const [oldPasscode, setOldPasscode] = useState('');
   const [newPasscode, setNewPasscode] = useState('');
   const [confirmNewPasscode, setConfirmNewPasscode] = useState('');
@@ -777,27 +779,6 @@ export default function GossipApp() {
                 </div>
               )}
 
-              {/* Group Selector */}
-              <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5 pl-1">Select Your Group</label>
-                {publicGroups.length === 0 ? (
-                  <div className="w-full px-4 py-3 rounded-xl text-xs glass-input text-gray-500 italic">
-                    No active groups available
-                  </div>
-                ) : (
-                  <select
-                    value={selectedLoginGroupId}
-                    onChange={(e) => setSelectedLoginGroupId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl text-xs glass-input bg-gossip-dark text-white cursor-pointer"
-                    required
-                  >
-                    {publicGroups.map(g => (
-                      <option key={g.id} value={g.id}>{g.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
               {/* Username */}
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1.5 pl-1">Username</label>
@@ -818,7 +799,6 @@ export default function GossipApp() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedLoginGroupId) setForgotGroupId(selectedLoginGroupId);
                       setShowForgotModal(true);
                       setForgotStatus(null);
                       setForgotError('');
@@ -840,8 +820,7 @@ export default function GossipApp() {
 
               <button
                 type="submit"
-                disabled={publicGroups.length === 0}
-                className="w-full py-3.5 bg-gradient-to-r from-gossip-purple to-gossip-pink hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all shadow-md text-xs cursor-pointer active:scale-[0.98] disabled:opacity-40"
+                className="w-full py-3.5 bg-gradient-to-r from-gossip-purple to-gossip-pink hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl transition-all shadow-md text-xs cursor-pointer active:scale-[0.98]"
               >
                 Access Gossip Chat
               </button>
@@ -899,16 +878,23 @@ export default function GossipApp() {
 
                   <div>
                     <label className="block text-xs font-medium text-gray-400 mb-1 pl-1">Select Gossip Group</label>
+                    <input
+                      type="text"
+                      placeholder="Search for group..."
+                      value={requestGroupFilter}
+                      onChange={(e) => setRequestGroupFilter(e.target.value)}
+                      className="w-full px-3 py-1.5 mb-2 rounded-lg text-[10px] glass-input bg-gossip-dark"
+                    />
                     <select
                       value={requestGroupId}
                       onChange={(e) => setRequestGroupId(e.target.value)}
                       className="w-full px-3 py-2.5 rounded-xl text-xs glass-input bg-gossip-dark"
                       required
                     >
-                      {publicGroups.length === 0 ? (
-                        <option value="">No active groups available</option>
+                      {publicGroups.filter(g => g.name.toLowerCase().includes(requestGroupFilter.toLowerCase())).length === 0 ? (
+                        <option value="">No matching groups available</option>
                       ) : (
-                        publicGroups.map(g => (
+                        publicGroups.filter(g => g.name.toLowerCase().includes(requestGroupFilter.toLowerCase())).map(g => (
                           <option key={g.id} value={g.id}>{g.name}</option>
                         ))
                       )}
@@ -1156,16 +1142,23 @@ export default function GossipApp() {
 
                   <div>
                     <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Select Your Group</label>
+                    <input
+                      type="text"
+                      placeholder="Search for group..."
+                      value={forgotGroupFilter}
+                      onChange={(e) => setForgotGroupFilter(e.target.value)}
+                      className="w-full px-3 py-1.5 mb-2 rounded-lg text-[10px] glass-input bg-gossip-dark"
+                    />
                     <select
                       value={forgotGroupId}
                       onChange={(e) => setForgotGroupId(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl text-xs glass-input bg-gossip-dark"
                       required
                     >
-                      {publicGroups.length === 0 ? (
-                        <option value="">No active groups</option>
+                      {publicGroups.filter(g => g.name.toLowerCase().includes(forgotGroupFilter.toLowerCase())).length === 0 ? (
+                        <option value="">No matching groups</option>
                       ) : (
-                        publicGroups.map(g => (
+                        publicGroups.filter(g => g.name.toLowerCase().includes(forgotGroupFilter.toLowerCase())).map(g => (
                           <option key={g.id} value={g.id}>{g.name}</option>
                         ))
                       )}
@@ -1214,7 +1207,7 @@ export default function GossipApp() {
           <span className="text-2xl animate-pulse">🤐</span>
           <div>
             <h1 className="text-xs font-black text-gray-500 uppercase tracking-widest">
-              Gossip Portal
+              Gossip
             </h1>
             <p className="text-[10px] text-purple-400 font-extrabold bg-purple-950/40 border border-purple-500/20 px-2 py-0.5 rounded-lg mt-0.5 max-w-[160px] truncate shadow-sm">
               🏢 {user.groupName}

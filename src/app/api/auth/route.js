@@ -94,6 +94,7 @@ export async function POST(request) {
         name: member.name,
         username: member.username,
         groupId: member.groupId,
+        groupName: group.name,
         role: member.role || 'member'
       }
     });
