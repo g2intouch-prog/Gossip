@@ -23,8 +23,16 @@ export default function SuperAdminPortal() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [password_1, setPassword_1] = useState('');
+  const [password_2, setPassword_2] = useState('');
   const [authError, setAuthError] = useState('');
+
+  // Settings States
+  const [settingsUsername, setSettingsUsername] = useState('');
+  const [settingsPassword1, setSettingsPassword1] = useState('');
+  const [settingsPassword2, setSettingsPassword2] = useState('');
+  const [settingsStatus, setSettingsStatus] = useState(null); // 'submitting' | 'success' | 'error'
+  const [settingsError, setSettingsError] = useState('');
 
   // Dashboard Data States
   const [groups, setGroups] = useState([]);
@@ -77,7 +85,7 @@ export default function SuperAdminPortal() {
       const res = await fetch('/api/super/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password_1, password_2 })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -85,9 +93,44 @@ export default function SuperAdminPortal() {
       }
       setAuthenticated(true);
       setUsername('');
-      setPassword('');
+      setPassword_1('');
+      setPassword_2('');
+      setSettingsUsername(username); // Set initial settings value
     } catch (err) {
       setAuthError(err.message);
+    }
+  };
+
+  const handleUpdateSettings = async (e) => {
+    e.preventDefault();
+    setSettingsStatus('submitting');
+    setSettingsError('');
+    setSuccessMsg('');
+    setErrorMsg('');
+    
+    try {
+      const res = await fetch('/api/super/auth', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: settingsUsername,
+          password_1: settingsPassword1,
+          password_2: settingsPassword2
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update credentials');
+      }
+      
+      setSettingsStatus('success');
+      setSuccessMsg('Super Admin credentials updated successfully! Log in next time with the new credentials.');
+      setSettingsPassword1('');
+      setSettingsPassword2('');
+    } catch (err) {
+      setSettingsStatus('error');
+      setSettingsError(err.message);
     }
   };
 
@@ -287,11 +330,23 @@ export default function SuperAdminPortal() {
             </div>
 
             <div>
-              <label className="block text-slate-300 text-xs font-bold uppercase tracking-wider mb-2">Password</label>
+              <label className="block text-slate-300 text-xs font-bold uppercase tracking-wider mb-2">Password 1</label>
               <input
                 type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                value={password_1}
+                onChange={e => setPassword_1(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-slate-950/80 border border-slate-800 focus:border-purple-500 text-white placeholder-slate-600 px-4 py-3.5 rounded-xl transition-all duration-300 focus:outline-none"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-300 text-xs font-bold uppercase tracking-wider mb-2">Password 2</label>
+              <input
+                type="password"
+                value={password_2}
+                onChange={e => setPassword_2(e.target.value)}
                 placeholder="••••••••"
                 className="w-full bg-slate-950/80 border border-slate-800 focus:border-purple-500 text-white placeholder-slate-600 px-4 py-3.5 rounded-xl transition-all duration-300 focus:outline-none"
                 required
@@ -359,17 +414,17 @@ export default function SuperAdminPortal() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 space-y-8 relative z-10">
         {/* Navigation Tabs */}
-        <div className="flex bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 max-w-md">
+        <div className="flex overflow-x-auto bg-slate-900/60 p-1.5 rounded-2xl border border-slate-800/80 max-w-md w-full">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'overview' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'overview' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
           >
             <Activity className="w-4 h-4" />
             Overview
           </button>
           <button
             onClick={() => setActiveTab('requests')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold relative transition-all duration-300 ${activeTab === 'requests' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold relative transition-all duration-300 ${activeTab === 'requests' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
           >
             <FileText className="w-4 h-4" />
             Requests
@@ -381,10 +436,17 @@ export default function SuperAdminPortal() {
           </button>
           <button
             onClick={() => setActiveTab('groups')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-300 ${activeTab === 'groups' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'groups' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
           >
             <Database className="w-4 h-4" />
             Groups
+          </button>
+          <button
+            onClick={() => setActiveTab('security')}
+            className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-2 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 ${activeTab === 'security' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+          >
+            <Shield className="w-4 h-4" />
+            Security
           </button>
         </div>
 
@@ -696,6 +758,72 @@ export default function SuperAdminPortal() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: SECURITY SETTINGS */}
+        {activeTab === 'security' && (
+          <div className="space-y-6 animate-fadeIn max-w-2xl">
+            <h2 className="text-xl font-extrabold text-slate-200">Super Admin Security Settings</h2>
+            
+            <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-6 backdrop-blur-md">
+              <form onSubmit={handleUpdateSettings} className="space-y-6">
+                {settingsError && (
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-4 rounded-xl flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <span>{settingsError}</span>
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Username</label>
+                  <input
+                    type="text"
+                    value={settingsUsername}
+                    onChange={e => setSettingsUsername(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 text-white px-4 py-3 rounded-xl focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">New Password 1</label>
+                    <input
+                      type="password"
+                      value={settingsPassword1}
+                      onChange={e => setSettingsPassword1(e.target.value)}
+                      placeholder="e.g. Super@123"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 text-white px-4 py-3 rounded-xl focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">New Password 2</label>
+                    <input
+                      type="password"
+                      value={settingsPassword2}
+                      onChange={e => setSettingsPassword2(e.target.value)}
+                      placeholder="e.g. Admin#456"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-purple-500 text-white px-4 py-3 rounded-xl focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 italic">
+                  Note: Both passwords must contain at least one alphabet, one number, and one special character.
+                </p>
+
+                <button
+                  type="submit"
+                  disabled={settingsStatus === 'submitting'}
+                  className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-purple-500/20 transition-colors disabled:opacity-50"
+                >
+                  {settingsStatus === 'submitting' ? 'Updating...' : 'Update Credentials'}
+                </button>
+              </form>
             </div>
           </div>
         )}

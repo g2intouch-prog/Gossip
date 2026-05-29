@@ -31,6 +31,14 @@ const DEFAULT_ADMIN = {
   lastSeen: new Date().toISOString()
 };
 
+// Seed default super admin data
+const DEFAULT_SUPER_ADMIN = {
+  id: 'superadmin',
+  username: 'superadmin',
+  password_1: 'Superadmin@1',
+  password_2: 'Superadmin@2'
+};
+
 // Initialize tables if they don't exist
 export async function initDB() {
   await sql`
@@ -69,6 +77,12 @@ export async function initDB() {
       data JSONB NOT NULL
     );
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS super_admin_credentials (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
 
   // Seed default data if tables are empty
   const groupsCount = await sql`SELECT count(*) FROM groups`;
@@ -79,6 +93,11 @@ export async function initDB() {
   const membersCount = await sql`SELECT count(*) FROM members`;
   if (parseInt(membersCount[0].count, 10) === 0) {
     await sql`INSERT INTO members (id, data) VALUES (${DEFAULT_ADMIN.id}, ${JSON.stringify(DEFAULT_ADMIN)})`;
+  }
+
+  const superAdminCount = await sql`SELECT count(*) FROM super_admin_credentials`;
+  if (parseInt(superAdminCount[0].count, 10) === 0) {
+    await sql`INSERT INTO super_admin_credentials (id, data) VALUES (${DEFAULT_SUPER_ADMIN.id}, ${JSON.stringify(DEFAULT_SUPER_ADMIN)})`;
   }
 }
 
@@ -329,15 +348,31 @@ export async function saveRequests(items) {
   return true;
 }
 
-export async function savePasswordResetRequests(items) {
+export async function savePasswordResetRequests(requestsData) {
   await dbInitialized;
   await sql`TRUNCATE TABLE password_reset_requests`;
-  if (items && items.length > 0) {
-    for (const item of items) {
-      await sql`INSERT INTO password_reset_requests (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
+  if (requestsData.length > 0) {
+    for (const req of requestsData) {
+      await sql`INSERT INTO password_reset_requests (id, data) VALUES (${req.id}, ${JSON.stringify(req)})`;
     }
   }
-  return true;
+}
+
+// SUPER ADMIN HELPERS
+export async function getSuperAdmin() {
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM super_admin_credentials WHERE id = 'superadmin' LIMIT 1`;
+  return rows.length > 0 ? rows[0].data : null;
+}
+
+export async function updateSuperAdmin(data) {
+  await dbInitialized;
+  await sql`
+    UPDATE super_admin_credentials 
+    SET data = ${JSON.stringify(data)} 
+    WHERE id = 'superadmin'
+  `;
+  return data;
 }
 
 export async function saveMessages(items) {
