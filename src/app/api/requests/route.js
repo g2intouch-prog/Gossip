@@ -30,10 +30,10 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, username, phone, groupId } = body;
+    const { name, username, phone, groupId, gender, age } = body;
 
-    if (!name || !username || !phone || !groupId) {
-      return NextResponse.json({ error: 'Name, Username, Phone number, and Group are required' }, { status: 400 });
+    if (!name || !username || !phone || !groupId || !gender || !age) {
+      return NextResponse.json({ error: 'Name, Username, Phone number, Group, Gender, and Age are required' }, { status: 400 });
     }
 
     // Verify group exists and is active
@@ -61,7 +61,9 @@ export async function POST(request) {
       name, 
       username, 
       phone, 
-      groupId 
+      groupId,
+      gender,
+      age
     });
     
     return NextResponse.json(newRequest, { status: 201 });
@@ -115,7 +117,9 @@ export async function PUT(request) {
         phone: req.phone,
         passcode,
         role: 'member',
-        groupId: session.groupId
+        groupId: session.groupId,
+        gender: req.gender,
+        age: req.age
       });
     }
 

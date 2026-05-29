@@ -42,6 +42,8 @@ export default function GossipApp() {
   const [requestUsername, setRequestUsername] = useState('');
   const [requestPhone, setRequestPhone] = useState('');
   const [requestGroupId, setRequestGroupId] = useState('');
+  const [requestGender, setRequestGender] = useState('male');
+  const [requestAge, setRequestAge] = useState('');
   const [requestStatus, setRequestStatus] = useState(null); // 'submitting' | 'success' | 'error'
   const [requestError, setRequestError] = useState('');
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -100,6 +102,8 @@ export default function GossipApp() {
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberPasscode, setNewMemberPasscode] = useState('');
   const [newMemberRole, setNewMemberRole] = useState('member');
+  const [newMemberGender, setNewMemberGender] = useState('male');
+  const [newMemberAge, setNewMemberAge] = useState('');
   const [memberError, setMemberError] = useState('');
 
   // WhatsApp Invitation States
@@ -237,7 +241,9 @@ export default function GossipApp() {
           name: requestName, 
           username: requestUsername,
           phone: requestPhone, 
-          groupId: requestGroupId 
+          groupId: requestGroupId,
+          gender: requestGender,
+          age: parseInt(requestAge, 10) || 0
         }),
       });
       const data = await res.json();
@@ -248,6 +254,8 @@ export default function GossipApp() {
       setRequestName('');
       setRequestUsername('');
       setRequestPhone('');
+      setRequestGender('male');
+      setRequestAge('');
     } catch (err) {
       setRequestStatus('error');
       setRequestError(err.message);
@@ -515,7 +523,9 @@ export default function GossipApp() {
           username: newMemberUsername,
           phone: newMemberPhone,
           passcode: newMemberPasscode,
-          role: newMemberRole
+          role: newMemberRole,
+          gender: newMemberGender,
+          age: parseInt(newMemberAge, 10) || 0
         }),
       });
       const data = await res.json();
@@ -529,6 +539,8 @@ export default function GossipApp() {
       setNewMemberPhone('');
       setNewMemberPasscode('');
       setNewMemberRole('member');
+      setNewMemberGender('male');
+      setNewMemberAge('');
       setShowAddMember(false);
     } catch (err) {
       setMemberError(err.message);
@@ -937,6 +949,32 @@ export default function GossipApp() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1 pl-1">Gender</label>
+                    <select
+                      required
+                      value={requestGender}
+                      onChange={(e) => setRequestGender(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-xs glass-input"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1 pl-1">Age</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="e.g. 25"
+                      value={requestAge}
+                      onChange={(e) => setRequestAge(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl text-xs glass-input"
+                    />
+                  </div>
+
                   <button
                     type="submit"
                     disabled={requestStatus === 'submitting' || publicGroups.length === 0}
@@ -1271,7 +1309,7 @@ export default function GossipApp() {
                 <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Set Availability Status</h2>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Lunch Toggle - Right Hand */}
+                  {/* Lunch Toggle */}
                   <button
                     onClick={() => handleToggleStatus('lunch')}
                     className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${
@@ -1281,13 +1319,12 @@ export default function GossipApp() {
                     }`}
                   >
                     <span className={`text-4xl mb-2 select-none ${userStatus.lunch ? 'animate-wave-right' : ''}`}>
-                      🙋‍♂️
+                      {currentMember.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'}
                     </span>
-                    <span className="text-xs font-bold">Lunch Available</span>
-                    <span className="text-[10px] text-gray-500 mt-1">Right Hand</span>
+                    <span className="text-xs font-bold">Available for lunch</span>
                   </button>
 
-                  {/* Dinner Toggle - Left Hand */}
+                  {/* Dinner Toggle */}
                   <button
                     onClick={() => handleToggleStatus('dinner')}
                     className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${
@@ -1297,10 +1334,9 @@ export default function GossipApp() {
                     }`}
                   >
                     <span className={`text-4xl mb-2 select-none ${userStatus.dinner ? 'animate-wave-left' : ''}`}>
-                      🙋‍♀️
+                      {currentMember.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'}
                     </span>
-                    <span className="text-xs font-bold">Dinner Available</span>
-                    <span className="text-[10px] text-gray-500 mt-1">Left Hand</span>
+                    <span className="text-xs font-bold">Available for dinner</span>
                   </button>
                 </div>
               </div>
@@ -1315,10 +1351,10 @@ export default function GossipApp() {
                 
                 <div className="flex gap-2">
                   <span className="px-2.5 py-0.5 rounded-full bg-amber-950/50 text-gossip-amber border border-gossip-amber/30 text-[10px] font-bold">
-                    🙋‍♂️ Lunch: {members.filter(m => m.lunchAvailable).length}
+                    🙋 Lunch: {members.filter(m => m.lunchAvailable).length}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full bg-pink-950/50 text-gossip-pink border border-gossip-pink/30 text-[10px] font-bold">
-                    🙋‍♀️ Dinner: {members.filter(m => m.dinnerAvailable).length}
+                    🙋 Dinner: {members.filter(m => m.dinnerAvailable).length}
                   </span>
                 </div>
               </div>
@@ -1387,14 +1423,14 @@ export default function GossipApp() {
                         <div className="flex items-center gap-1.5">
                           {status.lunch && (
                             <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-950/40 border border-gossip-amber/30 text-gossip-amber rounded-full text-[10px] font-bold shadow-sm">
-                              <span>🙋‍♂️</span>
+                              <span>{m.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'}</span>
                               <span>Lunch</span>
                             </div>
                           )}
                           
                           {status.dinner && (
                             <div className="flex items-center gap-1 px-2.5 py-1 bg-pink-950/40 border border-gossip-pink/30 text-gossip-pink rounded-full text-[10px] font-bold shadow-sm">
-                              <span>🙋‍♀️</span>
+                              <span>{m.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'}</span>
                               <span>Dinner</span>
                             </div>
                           )}
@@ -1461,12 +1497,12 @@ export default function GossipApp() {
                 
                 {activeChatUserStatus.lunch && (
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-950/40 border border-gossip-amber/35 text-gossip-amber rounded-full text-[9px] font-bold animate-pulse">
-                    🙋‍♂️ Lunch Available
+                    {activeChatUser.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'} Available for lunch
                   </span>
                 )}
                 {activeChatUserStatus.dinner && (
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-pink-950/40 border border-gossip-pink/35 text-gossip-pink rounded-full text-[9px] font-bold animate-pulse">
-                    🙋‍♀️ Dinner Available
+                    {activeChatUser.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'} Available for dinner
                   </span>
                 )}
                 {!activeChatUserStatus.lunch && !activeChatUserStatus.dinner && (
@@ -1630,8 +1666,8 @@ export default function GossipApp() {
 
                           {/* Quick indicators of hand status in list */}
                           <div className="flex items-center gap-1">
-                            {status.lunch && <span className="text-xs">🙋‍♂️</span>}
-                            {status.dinner && <span className="text-xs">🙋‍♀️</span>}
+                            {status.lunch && <span className="text-xs">{m.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'}</span>}
+                            {status.dinner && <span className="text-xs">{m.gender === 'female' ? '🙋‍♀️' : '🙋‍♂️'}</span>}
                           </div>
                         </button>
                       );
@@ -1723,6 +1759,32 @@ export default function GossipApp() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-400 mb-1 pl-1">Gender</label>
+                    <select
+                      value={newMemberGender}
+                      onChange={(e) => setNewMemberGender(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg text-xs glass-input bg-gossip-dark"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-gray-400 mb-1 pl-1">Age</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="e.g. 30"
+                      value={newMemberAge}
+                      onChange={(e) => setNewMemberAge(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg text-xs glass-input"
+                    />
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[10px] font-medium text-gray-400 mb-1 pl-1">Group Role</label>
                   <select
@@ -1795,6 +1857,30 @@ export default function GossipApp() {
                         onChange={(e) => setEditingMember({...editingMember, passcode: e.target.value})}
                         className="w-full px-3 py-2 rounded-lg text-xs glass-input font-mono text-center"
                       />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-400 mb-1 pl-1">Gender</label>
+                        <select
+                          value={editingMember.gender || 'male'}
+                          onChange={(e) => setEditingMember({...editingMember, gender: e.target.value})}
+                          className="w-full px-3 py-2 rounded-lg text-xs glass-input bg-gossip-dark"
+                        >
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-400 mb-1 pl-1">Age</label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          value={editingMember.age || ''}
+                          onChange={(e) => setEditingMember({...editingMember, age: parseInt(e.target.value, 10) || 0})}
+                          className="w-full px-3 py-2 rounded-lg text-xs glass-input"
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-[10px] font-medium text-gray-400 mb-1 pl-1">Role</label>

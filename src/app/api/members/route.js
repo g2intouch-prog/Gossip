@@ -44,10 +44,10 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { name, username, phone, passcode, role } = body;
+    const { name, username, phone, passcode, role, gender, age } = body;
 
-    if (!name || !username || !passcode) {
-      return NextResponse.json({ error: 'Name, Username, and Passcode are required' }, { status: 400 });
+    if (!name || !username || !passcode || !gender || !age) {
+      return NextResponse.json({ error: 'Name, Username, Passcode, Gender, and Age are required' }, { status: 400 });
     }
 
     const members = await getMembers();
@@ -64,7 +64,9 @@ export async function POST(request) {
       phone: phone || '',
       passcode,
       role: role || 'member',
-      groupId: session.groupId // Link member to the group of the admin who created them
+      groupId: session.groupId, // Link member to the group of the admin who created them
+      gender,
+      age
     });
 
     return NextResponse.json(newMember, { status: 201 });
@@ -81,8 +83,7 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { id, name, username, phone, passcode, role, lunchAvailable, dinnerAvailable } = body;
+    const { id, name, username, phone, passcode, role, lunchAvailable, dinnerAvailable, gender, age } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Member ID is required' }, { status: 400 });
@@ -128,6 +129,8 @@ export async function PUT(request) {
     if (phone !== undefined) updates.phone = phone;
     if (passcode !== undefined) updates.passcode = passcode;
     if (role !== undefined) updates.role = role;
+    if (gender !== undefined) updates.gender = gender;
+    if (age !== undefined) updates.age = age;
     if (lunchAvailable !== undefined) updates.lunchAvailable = !!lunchAvailable;
     if (dinnerAvailable !== undefined) updates.dinnerAvailable = !!dinnerAvailable;
 
