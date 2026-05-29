@@ -1,15 +1,8 @@
-// Dynamic import for @vercel/kv to avoid build crashes if not configured
-let kv = null;
-const isKVConfigured = !!(process.env.KV_REST_API_URL || process.env.KV_URL);
+import { neon } from '@neondatabase/serverless';
 
-if (isKVConfigured) {
-  try {
-    const kvModule = await import('@vercel/kv');
-    kv = kvModule.kv;
-  } catch (e) {
-    console.warn('Failed to import @vercel/kv, falling back to mock DB:', e.message);
-  }
-}
+// Initialize the SQL client
+// Make sure DATABASE_URL is set in your Vercel Environment Variables
+const sql = neon(process.env.DATABASE_URL);
 
 // Seed default group data
 const DEFAULT_GROUP = {
@@ -38,124 +31,69 @@ const DEFAULT_ADMIN = {
   lastSeen: new Date().toISOString()
 };
 
-// In-memory fallback store for serverless environments (Vercel)
-// Data here does NOT persist across function invocations without KV!
-let inMemoryDB = null;
+// Initialize tables if they don't exist
+export async function initDB() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS groups (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS group_requests (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS members (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS requests (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS password_reset_requests (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS messages (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSONB NOT NULL
+    );
+  `;
 
-function getDefaultDB() {
-  return {
-    groups: [DEFAULT_GROUP],
-    groupRequests: [],
-    members: [DEFAULT_ADMIN],
-    messages: [],
-    requests: [],
-    passwordResetRequests: []
-  };
-}
-
-// Detect if we can use the filesystem (local dev) or need in-memory (Vercel)
-// Cache the fs module reference for reuse
-let useFilesystem = false;
-let MOCK_DB_PATH = '';
-let fsModule = null;
-
-try {
-  const fsImport = await import('fs');
-  const pathImport = await import('path');
-  fsModule = fsImport.default;
-  MOCK_DB_PATH = pathImport.default.join(process.cwd(), 'gossip_mock_db.json');
-  // Test if we can write to the filesystem
-  if (fsModule.existsSync(MOCK_DB_PATH)) {
-    useFilesystem = true;
-  } else {
-    // Try creating the file to verify write access
-    fsModule.writeFileSync(MOCK_DB_PATH, JSON.stringify(getDefaultDB(), null, 2));
-    useFilesystem = true;
-  }
-} catch (e) {
-  // Filesystem not available (Vercel serverless), use in-memory
-  useFilesystem = false;
-  console.warn('Filesystem not available, using in-memory DB. Configure Vercel KV for persistence.');
-}
-
-function getMockDB() {
-  if (useFilesystem && fsModule) {
-    try {
-      if (!fsModule.existsSync(MOCK_DB_PATH)) {
-        const initialData = getDefaultDB();
-        fsModule.writeFileSync(MOCK_DB_PATH, JSON.stringify(initialData, null, 2));
-        return initialData;
-      }
-      const content = fsModule.readFileSync(MOCK_DB_PATH, 'utf-8');
-      const data = JSON.parse(content);
-      // Ensure all collections exist
-      if (!data.groups) data.groups = [DEFAULT_GROUP];
-      if (!data.groupRequests) data.groupRequests = [];
-      if (!data.members) data.members = [DEFAULT_ADMIN];
-      if (!data.messages) data.messages = [];
-      if (!data.requests) data.requests = [];
-      if (!data.passwordResetRequests) data.passwordResetRequests = [];
-      return data;
-    } catch (e) {
-      console.error('Error reading mock DB file:', e);
-    }
+  // Seed default data if tables are empty
+  const groupsCount = await sql`SELECT count(*) FROM groups`;
+  if (parseInt(groupsCount[0].count, 10) === 0) {
+    await sql`INSERT INTO groups (id, data) VALUES (${DEFAULT_GROUP.id}, ${JSON.stringify(DEFAULT_GROUP)})`;
   }
 
-  // In-memory fallback
-  if (!inMemoryDB) {
-    inMemoryDB = getDefaultDB();
+  const membersCount = await sql`SELECT count(*) FROM members`;
+  if (parseInt(membersCount[0].count, 10) === 0) {
+    await sql`INSERT INTO members (id, data) VALUES (${DEFAULT_ADMIN.id}, ${JSON.stringify(DEFAULT_ADMIN)})`;
   }
-  return inMemoryDB;
 }
 
-function writeMockDB(data) {
-  if (useFilesystem && fsModule) {
-    try {
-      fsModule.writeFileSync(MOCK_DB_PATH, JSON.stringify(data, null, 2));
-      return;
-    } catch (e) {
-      console.error('Error writing mock DB file, storing in memory:', e);
-    }
-  }
-  // In-memory fallback
-  inMemoryDB = data;
-}
+// Initialize on first import
+const dbInitialized = initDB().catch(console.error);
 
 // GROUPS HELPERS
 export async function getGroups() {
-  if (isKVConfigured) {
-    try {
-      let groups = await kv.get('gossip:groups');
-      if (!Array.isArray(groups)) {
-        groups = [DEFAULT_GROUP];
-        await kv.set('gossip:groups', groups);
-      }
-      return groups;
-    } catch (e) {
-      console.error('Error reading groups from KV, falling back to mock:', e);
-    }
-  }
-  const db = getMockDB();
-  return Array.isArray(db.groups) ? db.groups : [DEFAULT_GROUP];
-}
-
-export async function saveGroups(groups) {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:groups', groups);
-      return true;
-    } catch (e) {
-      console.error('Error saving groups to KV:', e);
-    }
-  }
-  const db = getMockDB();
-  db.groups = groups;
-  writeMockDB(db);
-  return true;
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM groups`;
+  return rows.map(r => r.data);
 }
 
 export async function addGroup(group) {
-  const groups = await getGroups();
+  await dbInitialized;
   const newGroup = {
     id: 'grp_' + Math.random().toString(36).substring(2, 9),
     status: 'active',
@@ -163,130 +101,66 @@ export async function addGroup(group) {
     createdAt: new Date().toISOString(),
     ...group
   };
-  groups.push(newGroup);
-  await saveGroups(groups);
+  await sql`INSERT INTO groups (id, data) VALUES (${newGroup.id}, ${JSON.stringify(newGroup)})`;
   return newGroup;
 }
 
 export async function updateGroup(id, updates) {
-  const groups = await getGroups();
-  let updatedGroup = null;
-  const updatedGroups = groups.map(g => {
-    if (g.id === id) {
-      updatedGroup = { ...g, ...updates };
-      return updatedGroup;
-    }
-    return g;
-  });
-  if (updatedGroup) {
-    await saveGroups(updatedGroups);
-  }
-  return updatedGroup;
+  await dbInitialized;
+  const result = await sql`
+    UPDATE groups 
+    SET data = data || ${JSON.stringify(updates)}::jsonb 
+    WHERE id = ${id} 
+    RETURNING data
+  `;
+  return result.length > 0 ? result[0].data : null;
 }
 
 export async function deleteGroup(id) {
-  const groups = await getGroups();
-  const filteredGroups = groups.filter(g => g.id !== id);
-  if (filteredGroups.length !== groups.length) {
-    await saveGroups(filteredGroups);
-    return true;
-  }
-  return false;
+  await dbInitialized;
+  const result = await sql`DELETE FROM groups WHERE id = ${id} RETURNING id`;
+  return result.length > 0;
 }
 
 // GROUP CREATION REQUESTS (SUPER ADMIN)
 export async function getGroupRequests() {
-  if (isKVConfigured) {
-    try {
-      const requests = await kv.get('gossip:groupRequests');
-      return Array.isArray(requests) ? requests : [];
-    } catch (e) {
-      console.error('Error reading groupRequests from KV:', e);
-    }
-  }
-  const db = getMockDB();
-  return Array.isArray(db.groupRequests) ? db.groupRequests : [];
-}
-
-export async function saveGroupRequests(requests) {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:groupRequests', requests);
-      return true;
-    } catch (e) {
-      console.error('Error saving groupRequests to KV:', e);
-    }
-  }
-  const db = getMockDB();
-  db.groupRequests = requests;
-  writeMockDB(db);
-  return true;
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM group_requests`;
+  return rows.map(r => r.data);
 }
 
 export async function addGroupRequest(request) {
-  const requests = await getGroupRequests();
+  await dbInitialized;
   const newRequest = {
     id: 'greq_' + Math.random().toString(36).substring(2, 9),
     status: 'pending',
     timestamp: new Date().toISOString(),
     ...request
   };
-  requests.push(newRequest);
-  await saveGroupRequests(requests);
+  await sql`INSERT INTO group_requests (id, data) VALUES (${newRequest.id}, ${JSON.stringify(newRequest)})`;
   return newRequest;
 }
 
 export async function updateGroupRequest(id, status) {
-  const requests = await getGroupRequests();
-  let updatedRequest = null;
-  const updatedRequests = requests.map(r => {
-    if (r.id === id) {
-      updatedRequest = { ...r, status };
-      return updatedRequest;
-    }
-    return r;
-  });
-  if (updatedRequest) {
-    await saveGroupRequests(updatedRequests);
-  }
-  return updatedRequest;
+  await dbInitialized;
+  const result = await sql`
+    UPDATE group_requests 
+    SET data = data || ${JSON.stringify({ status })}::jsonb 
+    WHERE id = ${id} 
+    RETURNING data
+  `;
+  return result.length > 0 ? result[0].data : null;
 }
 
 // MEMBERS HELPERS
 export async function getMembers() {
-  if (isKVConfigured) {
-    try {
-      let members = await kv.get('gossip:members');
-      if (!Array.isArray(members)) {
-        members = [DEFAULT_ADMIN];
-        await kv.set('gossip:members', members);
-      }
-      return members;
-    } catch (e) {
-      console.error('Error reading members from KV, falling back to mock:', e);
-    }
-  }
-  const db = getMockDB();
-  return Array.isArray(db.members) ? db.members : [DEFAULT_ADMIN];
-}
-
-export async function saveMembers(members) {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:members', members);
-      return true;
-    } catch (e) {
-      console.error('Error saving members to KV:', e);
-    }
-  }
-  const db = getMockDB();
-  db.members = members;
-  writeMockDB(db);
-  return true;
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM members`;
+  return rows.map(r => r.data);
 }
 
 export async function addMember(member) {
-  const members = await getMembers();
+  await dbInitialized;
   const newMember = {
     id: member.id || 'mem_' + Math.random().toString(36).substring(2, 9),
     lunchAvailable: false,
@@ -294,218 +168,185 @@ export async function addMember(member) {
     lastSeen: new Date().toISOString(),
     ...member
   };
-  members.push(newMember);
-  await saveMembers(members);
+  await sql`INSERT INTO members (id, data) VALUES (${newMember.id}, ${JSON.stringify(newMember)})`;
   return newMember;
 }
 
 export async function updateMember(id, updates) {
-  const members = await getMembers();
-  let updatedMember = null;
-  const updatedMembers = members.map(m => {
-    if (m.id === id) {
-      updatedMember = { ...m, ...updates, lastSeen: new Date().toISOString() };
-      return updatedMember;
-    }
-    return m;
-  });
-  if (updatedMember) {
-    await saveMembers(updatedMembers);
-  }
-  return updatedMember;
+  await dbInitialized;
+  const updateData = { ...updates, lastSeen: new Date().toISOString() };
+  const result = await sql`
+    UPDATE members 
+    SET data = data || ${JSON.stringify(updateData)}::jsonb 
+    WHERE id = ${id} 
+    RETURNING data
+  `;
+  return result.length > 0 ? result[0].data : null;
 }
 
 export async function deleteMember(id) {
-  const members = await getMembers();
-  const filteredMembers = members.filter(m => m.id !== id);
-  if (filteredMembers.length !== members.length) {
-    await saveMembers(filteredMembers);
-    return true;
-  }
-  return false;
+  await dbInitialized;
+  const result = await sql`DELETE FROM members WHERE id = ${id} RETURNING id`;
+  return result.length > 0;
 }
 
 // MEMBERSHIP REQUESTS HELPERS (GROUP ADMINS)
 export async function getRequests() {
-  if (isKVConfigured) {
-    try {
-      const requests = await kv.get('gossip:requests');
-      return Array.isArray(requests) ? requests : [];
-    } catch (e) {
-      console.error('Error reading requests from KV:', e);
-    }
-  }
-  const db = getMockDB();
-  return Array.isArray(db.requests) ? db.requests : [];
-}
-
-export async function saveRequests(requests) {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:requests', requests);
-      return true;
-    } catch (e) {
-      console.error('Error saving requests to KV:', e);
-    }
-  }
-  const db = getMockDB();
-  db.requests = requests;
-  writeMockDB(db);
-  return true;
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM requests`;
+  return rows.map(r => r.data);
 }
 
 export async function addRequest(request) {
-  const requests = await getRequests();
+  await dbInitialized;
   const newRequest = {
     id: 'req_' + Math.random().toString(36).substring(2, 9),
     status: 'pending',
     timestamp: new Date().toISOString(),
     ...request
   };
-  requests.push(newRequest);
-  await saveRequests(requests);
+  await sql`INSERT INTO requests (id, data) VALUES (${newRequest.id}, ${JSON.stringify(newRequest)})`;
   return newRequest;
 }
 
 export async function updateRequest(id, status) {
-  const requests = await getRequests();
-  let updatedRequest = null;
-  const updatedRequests = requests.map(r => {
-    if (r.id === id) {
-      updatedRequest = { ...r, status };
-      return updatedRequest;
-    }
-    return r;
-  });
-  if (updatedRequest) {
-    await saveRequests(updatedRequests);
-  }
-  return updatedRequest;
+  await dbInitialized;
+  const result = await sql`
+    UPDATE requests 
+    SET data = data || ${JSON.stringify({ status })}::jsonb 
+    WHERE id = ${id} 
+    RETURNING data
+  `;
+  return result.length > 0 ? result[0].data : null;
 }
 
 // PASSWORD RESET REQUESTS HELPERS
 export async function getPasswordResetRequests() {
-  if (isKVConfigured) {
-    try {
-      const requests = await kv.get('gossip:passwordResetRequests');
-      return Array.isArray(requests) ? requests : [];
-    } catch (e) {
-      console.error('Error reading passwordResetRequests from KV:', e);
-    }
-  }
-  const db = getMockDB();
-  return Array.isArray(db.passwordResetRequests) ? db.passwordResetRequests : [];
-}
-
-export async function savePasswordResetRequests(requests) {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:passwordResetRequests', requests);
-      return true;
-    } catch (e) {
-      console.error('Error saving passwordResetRequests to KV:', e);
-    }
-  }
-  const db = getMockDB();
-  db.passwordResetRequests = requests;
-  writeMockDB(db);
-  return true;
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM password_reset_requests`;
+  return rows.map(r => r.data);
 }
 
 export async function addPasswordResetRequest(request) {
-  const requests = await getPasswordResetRequests();
+  await dbInitialized;
   const newRequest = {
     id: 'reset_' + Math.random().toString(36).substring(2, 9),
     status: 'pending',
     timestamp: new Date().toISOString(),
     ...request
   };
-  requests.push(newRequest);
-  await savePasswordResetRequests(requests);
+  await sql`INSERT INTO password_reset_requests (id, data) VALUES (${newRequest.id}, ${JSON.stringify(newRequest)})`;
   return newRequest;
 }
 
 export async function updatePasswordResetRequest(id, status) {
-  const requests = await getPasswordResetRequests();
-  let updatedRequest = null;
-  const updatedRequests = requests.map(r => {
-    if (r.id === id) {
-      updatedRequest = { ...r, status };
-      return updatedRequest;
-    }
-    return r;
-  });
-  if (updatedRequest) {
-    await savePasswordResetRequests(updatedRequests);
-  }
-  return updatedRequest;
+  await dbInitialized;
+  const result = await sql`
+    UPDATE password_reset_requests 
+    SET data = data || ${JSON.stringify({ status })}::jsonb 
+    WHERE id = ${id} 
+    RETURNING data
+  `;
+  return result.length > 0 ? result[0].data : null;
 }
 
 // MESSAGES HELPERS
 export async function getMessages() {
-  if (isKVConfigured) {
-    try {
-      const messages = await kv.get('gossip:messages');
-      return Array.isArray(messages) ? messages : [];
-    } catch (e) {
-      console.error('Error reading messages from KV:', e);
-    }
-  }
-  const db = getMockDB();
-  return Array.isArray(db.messages) ? db.messages : [];
-}
-
-export async function saveMessages(messages) {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:messages', messages);
-      return true;
-    } catch (e) {
-      console.error('Error saving messages to KV:', e);
-    }
-  }
-  const db = getMockDB();
-  db.messages = messages;
-  writeMockDB(db);
-  return true;
+  await dbInitialized;
+  const rows = await sql`SELECT data FROM messages`;
+  return rows.map(r => r.data);
 }
 
 export async function addMessage(message) {
-  const messages = await getMessages();
+  await dbInitialized;
   const newMessage = {
     id: 'msg_' + Math.random().toString(36).substring(2, 9),
     timestamp: new Date().toISOString(),
     ...message
   };
-  messages.push(newMessage);
-  await saveMessages(messages);
+  await sql`INSERT INTO messages (id, data) VALUES (${newMessage.id}, ${JSON.stringify(newMessage)})`;
   return newMessage;
 }
 
 // ADMIN CLEAR DATABASE
 export async function clearAllData() {
-  if (isKVConfigured) {
-    try {
-      await kv.set('gossip:groups', [DEFAULT_GROUP]);
-      await kv.set('gossip:groupRequests', []);
-      await kv.set('gossip:members', [DEFAULT_ADMIN]);
-      await kv.set('gossip:messages', []);
-      await kv.set('gossip:requests', []);
-      await kv.set('gossip:passwordResetRequests', []);
-      return true;
-    } catch (e) {
-      console.error('Error clearing Vercel KV:', e);
-      return false;
+  await dbInitialized;
+  try {
+    await sql`TRUNCATE TABLE groups, group_requests, members, requests, password_reset_requests, messages`;
+    
+    // Reseed default data
+    await sql`INSERT INTO groups (id, data) VALUES (${DEFAULT_GROUP.id}, ${JSON.stringify(DEFAULT_GROUP)})`;
+    await sql`INSERT INTO members (id, data) VALUES (${DEFAULT_ADMIN.id}, ${JSON.stringify(DEFAULT_ADMIN)})`;
+    return true;
+  } catch (e) {
+    console.error('Error clearing database:', e);
+    return false;
+  }
+}
+
+// BULK SAVE HELPERS (Replaces entire table contents)
+export async function saveGroups(items) {
+  await dbInitialized;
+  await sql`TRUNCATE TABLE groups`;
+  if (items && items.length > 0) {
+    for (const item of items) {
+      await sql`INSERT INTO groups (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
     }
   }
-  const initialData = {
-    groups: [DEFAULT_GROUP],
-    groupRequests: [],
-    members: [DEFAULT_ADMIN],
-    messages: [],
-    requests: [],
-    passwordResetRequests: []
-  };
-  writeMockDB(initialData);
+  return true;
+}
+
+export async function saveMembers(items) {
+  await dbInitialized;
+  await sql`TRUNCATE TABLE members`;
+  if (items && items.length > 0) {
+    for (const item of items) {
+      await sql`INSERT INTO members (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
+    }
+  }
+  return true;
+}
+
+export async function saveGroupRequests(items) {
+  await dbInitialized;
+  await sql`TRUNCATE TABLE group_requests`;
+  if (items && items.length > 0) {
+    for (const item of items) {
+      await sql`INSERT INTO group_requests (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
+    }
+  }
+  return true;
+}
+
+export async function saveRequests(items) {
+  await dbInitialized;
+  await sql`TRUNCATE TABLE requests`;
+  if (items && items.length > 0) {
+    for (const item of items) {
+      await sql`INSERT INTO requests (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
+    }
+  }
+  return true;
+}
+
+export async function savePasswordResetRequests(items) {
+  await dbInitialized;
+  await sql`TRUNCATE TABLE password_reset_requests`;
+  if (items && items.length > 0) {
+    for (const item of items) {
+      await sql`INSERT INTO password_reset_requests (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
+    }
+  }
+  return true;
+}
+
+export async function saveMessages(items) {
+  await dbInitialized;
+  await sql`TRUNCATE TABLE messages`;
+  if (items && items.length > 0) {
+    for (const item of items) {
+      await sql`INSERT INTO messages (id, data) VALUES (${item.id}, ${JSON.stringify(item)})`;
+    }
+  }
   return true;
 }
